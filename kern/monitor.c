@@ -28,6 +28,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "hidden", "Run hidden test cases", exec_hidden_cases},
+	{ "show", "Display ASCII art for Lab 1 extra credit", mon_show },
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -65,6 +66,20 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
     // HINT 1: use read_ebp().
     // HINT 2: print the current ebp on the first line (not current_ebp[0])
 	return 0;
+}
+
+int
+mon_show(int argc, char **argv, struct Trapframe *tf)
+{	
+	// \033 == ESC, then [, then number (30 to 37), then m
+    cprintf("\033[31m   _______   \n");
+    cprintf("\033[32m  /       \\  \n");
+    cprintf("\033[33m |  o   o  | \n");
+    cprintf("\033[34m |    ^    | \n");
+    cprintf("\033[35m |  \\___/  | \n");
+    cprintf("\033[36m  \\_______/  \n");
+    cprintf("\033[0m"); // reset
+    return 0;
 }
 
 int exec_hidden_cases(int argc, char **argv, struct Trapframe *tf) {
