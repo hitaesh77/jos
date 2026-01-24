@@ -182,7 +182,7 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	// Your code here.
 
 	// the particular stab for line numbers is N_SLINE
-	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr + info->eip_fn_addr);
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr); // on line 158, we already edit addr
 	if (lline <= rline) {
 		info->eip_line = stabs[lline].n_desc;
 	} else {
