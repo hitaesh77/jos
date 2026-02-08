@@ -1,0 +1,7 @@
+Exercise 1 - Updated kern/pmap.c, specifically boot_alloc(), mem_init() (empty sections), page_init(), page_alloc(), and page_free(). When running make qemu-nox the test cases pass.
+
+Exercise 2 - TODO (Probably need a longer writeup summarizing)
+
+Exercise 3 - TODO (also probably explain what you did)
+
+Exercise 4 - Updated kern/pmap.c further, specfically pgdir_walk(), boot_map_region(), page_lookup(), page_remove(), and page_insert(), in that order since they depend on each. The test cases from make qemu-nox all pass.
