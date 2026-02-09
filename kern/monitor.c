@@ -28,6 +28,8 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "hidden", "Run hidden test cases", exec_hidden_cases},
+	{ "show", "Display ASCII art for Lab 1 extra credit", mon_show },
+	{ "backtrace", "Display stack backtrace", mon_backtrace }
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -74,9 +76,12 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 
 	cprintf("Stack backtrace:\n");
 	uint32_t *curr_ebp = (uint32_t*) read_ebp();
-	uint32_t curr_eip = *(curr_ebp + 1);
+	struct Eipdebuginfo info;
+	uint32_t curr_eip;
 	// according to example, each line has 2 spaces in front
 	while (curr_ebp != 0) {
+		curr_eip = *(curr_ebp + 1);
+
 		cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
 			curr_ebp,
 			curr_eip,
@@ -89,12 +94,28 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 
 		// implement debuginfo_eip to get more info
 		// according to example, debuginfo has 9 spaces in front for print statement
+		debuginfo_eip(curr_eip, &info);
+		cprintf("         %s:%d: %.*s+%d\n", info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, curr_eip - info.eip_fn_addr);
 
 		curr_ebp = (uint32_t*) *(curr_ebp); // next ebp
 	}
 
 	
 	return 0;
+}
+
+int
+mon_show(int argc, char **argv, struct Trapframe *tf)
+{	
+	// \033 == ESC, then [, then number (30 to 37), then m
+    cprintf("\033[31m   _______   \n");
+    cprintf("\033[32m  /       \\  \n");
+    cprintf("\033[33m |  o   o  | \n");
+    cprintf("\033[34m |    ^    | \n");
+    cprintf("\033[35m |  \\___/  | \n");
+    cprintf("\033[36m  \\_______/  \n");
+    cprintf("\033[0m"); // reset
+    return 0;
 }
 
 int exec_hidden_cases(int argc, char **argv, struct Trapframe *tf) {
