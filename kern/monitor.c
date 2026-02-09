@@ -10,8 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
-
-#include <kern/hidden.h>
+#include <kern/hidden.h> // needed this for it to compile after merging in lab1
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
