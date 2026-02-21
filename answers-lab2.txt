@@ -1,0 +1,102 @@
+Exercise 1 - Updated kern/pmap.c, specifically boot_alloc(), mem_init() (empty sections), page_init(), page_alloc(), and page_free(). When running make qemu-nox the test cases pass.
+
+Exercise 2 - Summary of reading:
+
+- Chapter 5.2 (Page Translation)
+    - The 80386 transforms 32 bit linear addresses into physical addresses using two level paging: this has a page directory and page tables
+    - This maps memory into 4K byte page frames and is activated by the PG bit in CR0. The CR3 register holds the base address of the directory
+    - Individual page table entries use accessed/dirty bits to help OS manage virtual memory. Present bit triggers exceptions for pages not currently in RAM
+    - The processor uses an on chip translation cache that must be flushed whenever page mapping changes. This is for performance purposes
+
+- Chapter 6.4 (Page Level Protection)
+    - Page level protection utilizes User/Supervisor (U/S) and Read/Write (R/W) bits in the page directory entrries and page table entrries
+    - Processor calculates protection by applying the most restrictive combination of attributes found in both the page directory and the page table
+
+Exercise 3 - Summary of Activities:
+
+    - Using QEMU monitor, inspected physical memory with:
+        xp /4x 0x00100000
+        0x1badb002 0x00000000 0xe4524ffe 0x7205c766
+        
+    - Using GDB, inspected virtual memory with:
+        x/4x 0xf0100000
+        0x1badb002 0x00000000 0xe4524ffe 0x7205c766
+
+    - This confirms that JOS maps physical memory starting at virtual address 0xf0000000. The relationship is:
+        virtual address = physical address + 0xf0000000
+        so 0xf0100000 - 0xf0000000 = 0x00100000.
+
+    - For the code snippet:
+        mystery_t x;
+        char* value = return_a_pointer();
+        *value = 10;
+        x = (mystery_t) value;
+
+    - the correct type for x is uintptr_t
+        - this is because value is a pointer and therefore represents a virtual address
+
+Exercise 4 - Updated kern/pmap.c further, specfically pgdir_walk(), boot_map_region(), page_lookup(), page_remove(), and page_insert(), in that order since they depend on each. The test cases from make qemu-nox all pass.
+
+Exercise 5 - 
+
+    A.
+    +-----+----------------------+---------------------------------------+
+    |Entry| Base Virtual Address |  Points to (logically)                |
+    +=====+======================+=======================================+
+    |1023 | 0xFFC00000           | Page table for top 4MB of phys memory |
+    +-----+----------------------+---------------------------------------+
+    |1022 | 0xFF800000           | Kernel stacks and kernel data         |
+    +-----+----------------------+---------------------------------------+
+    |.    | ?                    | ?                                     |
+    +-----+----------------------+---------------------------------------+
+    |.    | ?                    | ?                                     |
+    +-----+----------------------+---------------------------------------+
+    |.    | ?                    | ?                                     |
+    +-----+----------------------+---------------------------------------+
+    |2    | 0x00800000           | User text and data (UTEXT)            |
+    +-----+----------------------+---------------------------------------+
+    |1    | 0x00400000           | User temporary mappings (UTEMP)       |
+    +-----+----------------------+---------------------------------------+
+    |0    | 0x00000000           | User address space (low memory)       |
+    +-----+----------------------+---------------------------------------+
+
+    B.
+        - Kernel memory is protected by page permissions
+        - All kernel pages are mapped without the PTE_U bit set
+        - When CPU is in user mode, it checks the PTE_U bit on every memory access
+        - It does not let user program access a kernel only page 
+        - This stops user code from reading or writing kernel memory
+
+    C.
+        - 4GB
+        - Page size = 4096 (PGSIZE = 4096)
+        - Page directory = 1024 entries (NPDENTRIES = 1024)
+        - Each mapping = 4MB of memory (PTSIZE = 4096 × 1024 = 4MB)
+        - Max addressable physical memory = 1024 * 4MB = 4GB
+
+    D.
+        - If we had 4GB:
+        - Page directory: 1 page = 4KB (PGSIZE = 4096)
+        - Page tables: 1024 page tables × 4KB = 4MB
+        - struct PageInfo array:
+            - 4GB / 4KB = 1,048,576 pages
+            - Each PageInfo is 8 bytes
+            - Total = 8MB
+        - Total overhead = Page tables + pageinfo 
+            - 4MB + 8MB = 12MB
+
+        - TOTAL OVERHEAD = 12MB
+    
+    E.
+        - Transition Point: 
+            - occurs in kern/entry.S 
+            - jmp *%eax instruction that targets the relocated label
+
+        - What makes it possible: 
+            - Possible due to the entry page directory mapping the first 4MB of physical memory twice: 
+            - at virtual [0, 4MB) and [KERNBASE, KERNBASE+4MB)
+
+        - Why necessary: 
+            - kernel is linked to high addresses
+            - moving the EIP ensures symbol addresses match actual execution
+            - also frees the low virtual address space for user processes
