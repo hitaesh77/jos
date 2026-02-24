@@ -116,6 +116,18 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	size_t i = 1;
+	struct Env* curr = &envs[0];
+	curr->env_id = 0;
+	env_free_list = curr;
+	for (; i < NENV; i++) {
+		curr->env_link = &envs[i];
+		// curr->env_link->env_status = ENV_FREE;
+		curr->env_link->env_id = 0;
+		curr = curr->env_link;
+	}
+	curr->env_link = NULL;
+
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -163,7 +175,7 @@ env_setup_vm(struct Env *e)
 		return -E_NO_MEM;
 
 	// Now, set e->env_pgdir and initialize the page directory.
-	//
+	//	
 	// Hint:
 	//    - The VA space of all envs is identical above UTOP
 	//	(except at UVPT, which we've set below).
@@ -179,6 +191,11 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	e->env_pgdir = page2kva(p);
+	p->pp_ref++; // increment reference count
+	
+	memcpy(&e->env_pgdir[PDX(UTOP)], &kern_pgdir[PDX(UTOP)], sizeof(pde_t) * (NPDENTRIES - PDX(UTOP)));
+
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
