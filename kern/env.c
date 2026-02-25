@@ -279,6 +279,26 @@ region_alloc(struct Env *e, void *va, size_t len)
 {
 	// LAB 3: Your code here.
 	// (But only if you need it for load_icode.)
+
+	// void* are apparently bad..?
+	char* start = ROUNDDOWN(va, PGSIZE);
+	char* end = ROUNDUP(va + len, PGSIZE);
+
+	size_t n_pages = (end - start) / PGSIZE; 
+	struct PageInfo* pp;
+	int insert_status;
+	for(size_t i=0; i<n_pages; i++) {
+		pp = page_alloc(0);
+		if (pp == NULL) {
+			panic("Panic in region_alloc, i=%d", i);
+		}
+		insert_status = page_insert(e->env_pgdir, pp, start + PGSIZE*i, PTE_U | PTE_W);
+		if (insert_status != 0) {
+			panic("Panic in region_alloc: %e", insert_status);
+		}
+	}
+
+
 	//
 	// Hint: It is easier to use region_alloc if the caller can pass
 	//   'va' and 'len' values that are not page-aligned.
@@ -340,11 +360,48 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	
+	// check elf
+	struct Elf* elf = (struct Elf*)binary;
+	if (elf->e_magic != ELF_MAGIC) {
+		panic("load_icode: ELF magic bits are wrong");
+	}
+
+	// program header (according to video)
+	struct Proghdr* ph = (struct Proghdr*)(binary + elf->e_phoff);
+	struct Proghdr* end_ph = ph + elf->e_phnum;
+
+	// Context switch. save cr3 and then load the new pgdir
+	uint32_t old_pgdir = rcr3();
+	lcr3(PADDR(e->env_pgdir)); // need to give it physical address
+
+	// load
+	for (; ph < end_ph; ph++) {
+		if (ph->p_type != ELF_PROG_LOAD) continue;
+
+		// check size
+		if (ph->p_filesz > ph->p_memsz) {
+			panic("load_icode: p_filesz > p_memsz");
+		}
+
+		region_alloc(e, (void*)ph->p_va, ph->p_memsz);
+		memcpy((void*)ph->p_va, binary+ph->p_offset, ph->p_filesz);
+		
+		// clear remaining to zero
+		memset((void*)(ph->p_va+ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+	}
+
+	// set the instruction pointer to the entrypoint of the ececutable
+	e->env_tf.tf_eip = elf->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	region_alloc(e, (void*)(USTACKTOP - PGSIZE), PGSIZE);
+
+	// Restore the old page directory
+	lcr3(old_pgdir);
 }
 
 //
@@ -358,6 +415,19 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+
+	// allocate new env with env_alloc
+	struct Env* process;
+	int return_code = env_alloc(&process, 0);
+	if (return_code < 0) {
+		panic("env_create: %e", return_code);
+	}
+
+	// Load named elf binary with load_icode
+	load_icode(process, binary);
+
+	// set env type
+	process->env_type = type;
 }
 
 //
@@ -475,6 +545,16 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 
-	panic("env_run not yet implemented");
+	if (curenv != e) {
+		// context switch
+		if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
+			curenv->env_status = ENV_RUNNABLE; // 1
+		}
+		curenv = e;                        // 2
+		curenv->env_status = ENV_RUNNING;  // 3
+		curenv->env_runs++;                // 4
+		lcr3(PADDR(curenv->env_pgdir));        // 5
+	}
+	env_pop_tf(&(curenv->env_tf)); // step 2
 }
 
