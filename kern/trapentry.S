@@ -75,6 +75,9 @@ TRAPHANDLER(t_align,   T_ALIGN)
 TRAPHANDLER_NOEC(t_mchk,    T_MCHK)
 TRAPHANDLER_NOEC(t_simderr, T_SIMDERR)
 
+# syscall
+TRAPHANDLER_NOEC(t_syscall, T_SYSCALL)
+
 
 # _alltraps: build a Trapframe and call trap(tf)
 
