@@ -201,6 +201,11 @@ trap_dispatch(struct Trapframe *tf)
 
 		// dispatch page fault exceptions (exercise 5)
 		case T_PGFLT:
+			// Check if page fault happened in user or kernel mode
+			if ((tf->tf_cs & 3) == 0) {
+				// kernel
+				panic("page fault occurred in kernel mode - kernel panic");
+			}
 			page_fault_handler(tf);
 			return;
 
