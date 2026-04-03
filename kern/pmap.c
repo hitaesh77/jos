@@ -276,6 +276,14 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	size_t kstacktop_i;
+	for (int i=0; i<NCPU; i++) {
+		// allocate kernel stack
+		kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_P | PTE_W);
+		// do NOT actually map this.
+		// boot_map_region(kern_pgdir, kstacktop_i - (KSTKSIZE + KSTKGAP), KSTKGAP, PADDR(percpu_kstacks[i]), PTE_W);
+	}
 
 }
 
@@ -321,7 +329,11 @@ page_init(void)
 	for (i = 0; i < npages; i++) {
 		// if page is already taken (page 0 OR IO hole OR extended memory before free page)
 		// then increment reference counter
-		if (i == 0 || (i >= npages_basemem && i < PGNUM(EXTPHYSMEM)) || (PGNUM(EXTPHYSMEM) <= i && i < first_free)) {
+		if ((i == 0) || 
+			(i >= npages_basemem && i < PGNUM(EXTPHYSMEM)) || 
+			(PGNUM(EXTPHYSMEM) <= i && i < first_free) || 
+			(MPENTRY_PADDR == page2pa(&pages[i]))) {
+			// set as reserved, do not add to page free list.
 			pages[i].pp_ref = 1;
 			pages[i].pp_link = NULL;
 			continue;
@@ -596,7 +608,12 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	size_t size_rounded = ROUNDUP(size, PGSIZE);
+	if (base + size_rounded > MMIOLIM) panic("mmio_map_region would overflow MMIOLIM");
+	void* to_ret = (void*)base;
+	boot_map_region(kern_pgdir, base, size_rounded, pa, PTE_PCD | PTE_PWT | PTE_W);
+	base += size_rounded; // since it is static
+	return to_ret;
 }
 
 static uintptr_t user_mem_check_addr;

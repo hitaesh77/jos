@@ -1,0 +1,2 @@
+Question 1:
+MPBOOTPHYS is needed because mpentry.S is linked as part of the kernel at a high virtual address above KERNBASE. The boot_aps() function copies to a lower address at MPENTRY_PADDR. MPBOOTPHYS converts a linked address into the physical address after it is copied. boot.S does not need this because it is loaded at a lower address so it does not need to be copied and have its physical addresses translated. Without MPBOOTPHYS instructions such as lgdt would use the wrong address.
