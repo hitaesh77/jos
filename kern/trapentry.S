@@ -44,6 +44,72 @@
 
 .text
 
+# trap entry points
+# err code or no err code determined by intel 64 isa-32
+# given in ordefr from trap.h
+
+# no err code ones
+TRAPHANDLER_NOEC(t_divide,  T_DIVIDE)
+TRAPHANDLER_NOEC(t_debug,   T_DEBUG)
+TRAPHANDLER_NOEC(t_nmi,     T_NMI)
+TRAPHANDLER_NOEC(t_brkpt,   T_BRKPT)
+TRAPHANDLER_NOEC(t_oflow,   T_OFLOW)
+TRAPHANDLER_NOEC(t_bound,   T_BOUND)
+TRAPHANDLER_NOEC(t_illop,   T_ILLOP)
+TRAPHANDLER_NOEC(t_device,  T_DEVICE)
+
+# err coded ones
+TRAPHANDLER(t_dblflt,  T_DBLFLT)
+TRAPHANDLER(t_tss,     T_TSS)
+TRAPHANDLER(t_segnp,   T_SEGNP)
+TRAPHANDLER(t_stack,   T_STACK)
+TRAPHANDLER(t_gpflt,   T_GPFLT)
+TRAPHANDLER(t_pgflt,   T_PGFLT)
+
+# fperr has no err code
+TRAPHANDLER_NOEC(t_fperr,   T_FPERR)
+
+# has error code
+TRAPHANDLER(t_align,   T_ALIGN)
+
+# no err code
+TRAPHANDLER_NOEC(t_mchk,    T_MCHK)
+TRAPHANDLER_NOEC(t_simderr, T_SIMDERR)
+
+# syscall
+TRAPHANDLER_NOEC(t_syscall, T_SYSCALL)
+
+
+# _alltraps: build a Trapframe and call trap(tf)
+
+.globl _alltraps
+.type _alltraps, @function
+.align 2
+_alltraps:
+    # build struct Trapframe on the stack
+
+    # by now hardware alr pushed eip, cs, eflags, esp/ss if user mode, and maybe err code
+    # now need to push rest of Trapframe
+
+    pushl %ds   # push data seg reg
+    pushl %es   # push extra seg reg
+    pushal      # push all general purpose regs on stack
+
+    # switch to kernel data segments
+    movw $GD_KD, %ax
+    movw %ax, %ds
+    movw %ax, %es
+
+    # push curr stack pointer to Trapframe to trap()
+    # C equiv: trap((struct Trapframe *)esp);
+    pushl %esp
+    call trap
+
+    # trap() should not return (env_run -> iret), but just in case:
+    addl $4, %esp
+1:
+    jmp 1b
+
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
