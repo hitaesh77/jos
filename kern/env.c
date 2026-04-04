@@ -579,8 +579,10 @@ env_run(struct Env *e)
 		curenv = e;                        // 2
 		curenv->env_status = ENV_RUNNING;  // 3
 		curenv->env_runs++;                // 4
+		// RIGHT BEFORE switching to user mode...?
 		lcr3(PADDR(curenv->env_pgdir));        // 5
 	}
+	unlock_kernel();
 	env_pop_tf(&(curenv->env_tf)); // step 2
 }
 
