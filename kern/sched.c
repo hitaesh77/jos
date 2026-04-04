@@ -11,7 +11,7 @@ void sched_halt(void);
 void
 sched_yield(void)
 {
-	struct Env *idle;
+	// struct Env *idle; // not sure what this is for????
 
 	// Implement simple round-robin scheduling.
 	//
@@ -28,10 +28,72 @@ sched_yield(void)
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
 
+	/**
 	// LAB 4: Your code here.
+	bool set_new_env = false;
+	if (curenv == NULL) {
+		// it's null...
+		for (size_t i=0; i<NENV; i++) {
+			// First such ENV_RUNNABLE env
+			// curenv = &envs[i];
+			if (envs[i].env_status == ENV_RUNNABLE) {
+				set_new_env = true;
+				env_run(&envs[i]);
+			}
+		}
+	}
+	// currently running env is curenv. start loop at it's index
+	// loop (curenv, nenv)
+	else if (!set_new_env) {
+		for(size_t i=1+(size_t)(curenv-envs); i<NENV; i++) {
+			if (envs[i].env_status == ENV_RUNNABLE) {
+				// First such ENV_RUNNABLE env
+				// curenv = &envs[i];
+				set_new_env = true;
+				env_run(&envs[i]);
+				// break;
+			}
+		}	
+		// if not found, loop [0, curenv)
+		for (size_t i=0; i<(size_t)(curenv-envs); i++) {
+			// First such ENV_RUNNABLE env
+			// curenv = &envs[i];
+			if (envs[i].env_status == ENV_RUNNABLE) {
+				set_new_env = true;
+				env_run(&envs[i]);
+			}
+			// break;
+		}
+	}
+	// If no envs running, but curenv is env running, choose that
+	else if (!set_new_env && curenv->env_status == ENV_RUNNING) {
+		env_run(curenv);
+	} // just stay I guess
+	// otherwise, we must continue to sched halt.
+	else {
+		// sched_halt never returns
+		sched_halt();
+	}
+	*/
+	int start_idx = 0;
+	if (curenv != NULL) {
+		start_idx = curenv - envs + 1;
+	}
+	// search
+	for (int i=0; i<NENV; i++) {
+		// use modulo to do it in one loop
+		if (envs[(start_idx + i)%NENV].env_status == ENV_RUNNABLE) {
+			env_run(&envs[(start_idx + i)%NENV]);
+		}
+	}
 
-	// sched_halt never returns
+	// we didnt find anythni
+	if (curenv && curenv->env_status == ENV_RUNNING) {
+		env_run(curenv);
+	}
+	// uh oh halt
 	sched_halt();
+
 }
 
 // Halt this CPU when there is nothing to do. Wait until the
