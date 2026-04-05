@@ -40,4 +40,4 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 
 	// Save handler pointer for assembly to call.
 	_pgfault_handler = handler;
-}
+} 
