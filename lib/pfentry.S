@@ -20,7 +20,7 @@
 //	utf_regs.reg_esi
 //	utf_regs.reg_edi
 //	utf_err (error code)
-//	utf_fault_va            <-- %esp
+//	utf_fault_va            <-- %esp  
 //
 // If this is a recursive fault, the kernel will reserve for us a
 // blank word above the trap-time esp for scratch work when we unwind
@@ -65,18 +65,29 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
+	movl 48(%esp), %eax
+    subl $4, %eax
+    movl %eax, 48(%esp)
+    movl 40(%esp), %edx
+    movl %edx, (%eax)
 
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
+	add $8, %esp
+    popal 
 
 	// Restore eflags from the stack.  After you do this, you can
 	// no longer use arithmetic operations or anything else that
 	// modifies eflags.
 	// LAB 4: Your code here.
+	add $0x4, %esp
+	popf
 
 	// Switch back to the adjusted trap-time stack.
 	// LAB 4: Your code here.
+	movl (%esp), %esp 
 
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+	ret

@@ -347,6 +347,8 @@ void
 page_fault_handler(struct Trapframe *tf)
 {
 	uint32_t fault_va;
+	uintptr_t utf_addr;
+	size_t utf_size;
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
@@ -388,9 +390,39 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	if ((tf->tf_cs & 3) == 0)
+		panic("page fault in kernel mode");
 
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
+	if (curenv->env_pgfault_upcall == NULL)
+		// goto to avoid mesing up if else like with sched yield :(
+		goto destroy;
+
+	if (tf->tf_esp >= UXSTACKTOP - PGSIZE && tf->tf_esp < UXSTACKTOP) {
+		utf_addr = tf->tf_esp - sizeof(uint32_t) - sizeof(struct UTrapframe);
+		utf_size = sizeof(uint32_t) + sizeof(struct UTrapframe);
+	} else {
+		utf_addr = UXSTACKTOP - sizeof(struct UTrapframe);
+		utf_size = sizeof(struct UTrapframe);
+	}
+
+	// check if the user environment has allocated a page for its exception stack
+	user_mem_assert(curenv, (void *) utf_addr, utf_size, PTE_W);
+
+	struct UTrapframe *utf = (struct UTrapframe *) utf_addr;
+	utf->utf_fault_va = fault_va;
+	utf->utf_err = tf->tf_err;
+	utf->utf_regs = tf->tf_regs;
+	utf->utf_eip = tf->tf_eip;
+	utf->utf_eflags = tf->tf_eflags;
+	utf->utf_esp = tf->tf_esp;
+
+	curenv->env_tf.tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+	curenv->env_tf.tf_esp = utf_addr;
+	env_run(curenv);
+
+	// destroy the environment that cause the fault
+destroy:
+	cprintf("[%08x] user fault va %08x ip %08x\n", // [%08x] to format as hex
 		curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);
 	env_destroy(curenv);
