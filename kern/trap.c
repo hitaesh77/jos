@@ -80,6 +80,7 @@ void t_fperr(void);
 void t_align(void);
 void t_mchk(void);
 void t_simderr(void);
+void t_syscall(void);
 
 void
 trap_init(void)
@@ -115,6 +116,7 @@ trap_init(void)
 	SETGATE(idt[T_ALIGN],   0, GD_KT, t_align,   0);
 	SETGATE(idt[T_MCHK],    0, GD_KT, t_mchk,    0);
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, t_simderr, 0);
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, t_syscall, 3); // also needs to be accessible in user mode
 
 	// Per-CPU setup (TSS + lidt)
 	trap_init_percpu();
@@ -199,12 +201,28 @@ trap_dispatch(struct Trapframe *tf)
 
 		// dispatch page fault exceptions (exercise 5)
 		case T_PGFLT:
+			// Check if page fault happened in user or kernel mode
+			if ((tf->tf_cs & 3) == 0) {
+				// kernel
+				panic("page fault occurred in kernel mode - kernel panic");
+			}
 			page_fault_handler(tf);
 			return;
 
 		case T_BRKPT:
 			monitor(tf);
 			return;
+
+		case T_SYSCALL:
+			tf->tf_regs.reg_eax = syscall(
+				tf->tf_regs.reg_eax,
+				tf->tf_regs.reg_edx,
+				tf->tf_regs.reg_ecx,
+				tf->tf_regs.reg_ebx,
+				tf->tf_regs.reg_edi,
+				tf->tf_regs.reg_esi
+			);
+			return; // pass return value back to user???
 
 		default:
 			break;

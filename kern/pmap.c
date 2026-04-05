@@ -554,6 +554,30 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	char* start = (char*)ROUNDDOWN(va, PGSIZE);
+	char* end = (char*)ROUNDUP(va + len, PGSIZE);
+	size_t n_pages = (end - start) / PGSIZE; 
+	if (n_pages == 0) return 0;
+	char* addr;
+	pte_t* pte;
+
+	for (size_t i=0; i<n_pages; i++) {
+		addr = start + i * PGSIZE;
+		pte = pgdir_walk(env->env_pgdir, (void*)addr, 0);
+		// 1) check address below ULIM
+		if (addr >= (char*)ULIM) {
+			uintptr_t bad_addr = (uintptr_t)va > (uintptr_t)addr ? (uintptr_t)va : (uintptr_t)addr;
+			user_mem_check_addr = bad_addr;
+			return -E_FAULT;
+		}
+		// 2) Page table gives it permission
+		if (!pte || ((*pte & (perm | PTE_P)) != (perm | PTE_P))) {
+			uintptr_t bad_addr = (uintptr_t)va > (uintptr_t)addr ? (uintptr_t)va : (uintptr_t)addr;
+			user_mem_check_addr = bad_addr;
+			return -E_FAULT;
+		}
+	}
+
 
 	return 0;
 }

@@ -17,3 +17,8 @@ No, we didn’t have to do anything extra.
 int $14 from user mode is not allowed because the page fault IDT entry is set to privilege level 0.
 The CPU then blocks it and raises a General Protection Fault (trap 13) instead. 
 If we allowed user to directly call page fault handler, it would let user programs jump into the kernel code, which is unsafe.
+
+Exercise 9 Question:
+
+This page fault is caused by monitor.c's mon_backtrace function when it takes five arguments off the stack at each iteration of the loop.
+This loop can go higher than USTACKTOP into unmapped memory, which will cause the page fault that I observed.
