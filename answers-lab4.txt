@@ -1,10 +1,14 @@
-Exercise 5:
+Exercise 2: 
 Question 1:
 MPBOOTPHYS is needed because mpentry.S is linked as part of the kernel at a high virtual address above KERNBASE. The boot_aps() function copies to a lower address at MPENTRY_PADDR. MPBOOTPHYS converts a linked address into the physical address after it is copied. boot.S does not need this because it is loaded at a lower address so it does not need to be copied and have its physical addresses translated. Without MPBOOTPHYS instructions such as lgdt would use the wrong address.
 
+Exercise 5:
+Question 1:
+Even with the big kernel lock, each CPU still needs its own kernel stack because the CPU switches to a kernel stack immediately when a trap or interrupt happens, before it acquires the lock. For example, if CPU 1 is already in the kernel and using its kernel stack while holding the big kernel lock, and CPU 0 takes an interrupt from user mode, CPU 0 will immediately start pushing its trap frame onto a kernel stack. If all CPUs shared one kernel stack, CPU 0 would overwrite CPU 1's saved state before it ever got the lock. That would corrupt the kernel stack, so separate kernel stacks are still necessary.
+
 Exercise 6:
 Question 1:
-The lcr3() function changes the current page directory, but JOS keeps the kernel sub0portion of the address space the same regardless of which process you are in as the kernel always needs to be accessed. The argument e, which is of type struct Env, is in memory which is mapped to the kernel, not to the user, because it needs to be accesssed by every process. Thus, even after we switch the CR3 register, its virtual address still maps to the same physical memory.
+The lcr3() function changes the current page directory, but JOS keeps the kernel subportion of the address space the same regardless of which process you are in as the kernel always needs to be accessed. The argument e, which is of type struct Env, is in memory which is mapped to the kernel, not to the user, because it needs to be accesssed by every process. Thus, even after we switch the CR3 register, its virtual address still maps to the same physical memory.
 
 Question 2:
 Since a process (aka an environment) saves the Trapframe including registers. This is because when we switch to running new code during a context switch, it will overwrite the CPU state including registers and when we go back to executing it, we will have lost some of this information. This all happens in trapentry.S, and the procedure of building a Trapframe, and calling the trap() function to copy the CPU state into curenv->env_tf. 
