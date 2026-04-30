@@ -166,10 +166,62 @@ cga_init(void)
 
 static void
 cga_putc(int c)
-{
+{	
+	const int NORMAL_COLOR = 0x0700;
+	static int color = NORMAL_COLOR;
+	static int fsm_state = 0;
 	// if no attribute given, then use black on white
-	if (!(c & ~0xFF))
-		c |= 0x0700;
+	if (!(c & ~0xFF)) // if it had a color, it would occupy more than 0xFF so mask fails
+		c |= color;
+
+	static const char ansi2cga[8] = {0, 4, 2, 14, 1, 5, 3, 7};
+
+	switch (fsm_state) {
+	case 0:
+		if (c == 0x1B) {
+			fsm_state = 1;
+			return; // dont actually print this out, its an escape
+		}
+		break;
+	
+	case 1:
+		if (c == '[') {
+			fsm_state = 2;
+			return; // dont print, escape sequence
+		}
+		fsm_state = 0; // if we get here, we got an escape, then nothing else, so go back to normal printing
+		break;
+	
+	case 2: 
+		if (c == '0') {
+			color = NORMAL_COLOR; // we need a 3 to put in colors. "[0 ..." doesnt do anything
+			fsm_state = 4;
+			return; // dont print
+		}
+		if (c == '3') {
+			fsm_state = 3; // color parsing state
+			return; // dont print
+		}
+		fsm_state = 0;
+		break;
+
+	case 3:
+		if (c >= '0' && c <= '7') { // must be between 30 and 37 since we came from case 2 if statement 2
+			int digit  = c - '0'; // atoi but worse
+			color = (ansi2cga[digit]) << 8; // ex. red A is 0x41, 0x0400 (shift left 8 bits, 2 bytes) | 0x41 = 0x0441 
+			fsm_state = 4;
+			return;
+		}
+		fsm_state = 0;
+		break;
+
+	case 4:
+		fsm_state = 0;
+		if (c == 'm') {
+			return; // ending code has an "m" after the 0 (case 2 first if statement)
+		}
+		break;
+	}
 
 	switch (c & 0xff) {
 	case '\b':
@@ -197,6 +249,7 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
+	// ans: for scrolling when the screen is full, because it moves the buffer up by one row, and clears the bottom row with 0x0700
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
