@@ -78,35 +78,31 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	int r;
+	void *va = (void *)(pn * PGSIZE);
+	pte_t pte = uvpt[pn];
 
 	// LAB 4: Your code here.
 	// panic("duppage not implemented");
 
-	void *va = (void *)(pn * PGSIZE); // curr virtual address of page number
-    pte_t pte = uvpt[pn]; // read pte
+	if (pte & PTE_SHARE) {
+		r = sys_page_map(0, va, envid, va, pte & PTE_SYSCALL);
+		if (r < 0)
+			panic("duppage: shared map failed: %e", r);
+	} else if ((pte & PTE_W) || (pte & PTE_COW)) {
+		r = sys_page_map(0, va, envid, va, PTE_P | PTE_U | PTE_COW);
+		if (r < 0)
+			panic("duppage: child map failed: %e", r);
 
-    // remap as COW if page writable OR already COW.
-    if ((pte & PTE_W) || (pte & PTE_COW)) {
-        r = sys_page_map(0, va, envid, va, PTE_P | PTE_U | PTE_COW);
-        if (r < 0) {
-            panic("duppage: child map failed: %e", r);
-		}
+		r = sys_page_map(0, va, 0, va, PTE_P | PTE_U | PTE_COW);
+		if (r < 0)
+			panic("duppage: parent remap failed: %e", r);
+	} else {
+		r = sys_page_map(0, va, envid, va, pte & PTE_SYSCALL);
+		if (r < 0)
+			panic("duppage: read-only map failed: %e", r);
+	}
 
-        // remap parent as COW too
-        r = sys_page_map(0, va, 0, va, PTE_P | PTE_U | PTE_COW);
-        if (r < 0) {
-            panic("duppage: parent remap failed: %e", r);
-		}
-
-    } else {
-        // read only page, no COW
-        r = sys_page_map(0, va, envid, va, PTE_P | PTE_U);
-        if (r < 0) {
-            panic("duppage: read-only map failed: %e", r);
-		}
-    }
-
-    return 0;
+	return 0;
 }
 
 //

@@ -101,7 +101,7 @@ flush_block(void *addr)
 		panic("flush_block: ide_write: %e", r);
 
 	if ((r = sys_page_map(0, addr, 0, addr,
-	                      PTE_U | PTE_P | PTE_W)) < 0)
+	                      uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
 		panic("flush_block: sys_page_map: %e", r);
 }
 
@@ -173,4 +173,3 @@ bc_init(void)
 	// cache the super block by reading it once
 	memmove(&super, diskaddr(1), sizeof super);
 }
-

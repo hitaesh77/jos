@@ -206,6 +206,7 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 			return newb;
 
 		*diskbno = newb;
+		memset(diskaddr(newb), 0, BLKSIZE);
 	}
 
 	*blk = diskaddr(*diskbno);
@@ -512,4 +513,3 @@ fs_sync(void)
 	for (i = 1; i < super->s_nblocks; i++)
 		flush_block(diskaddr(i));
 }
-

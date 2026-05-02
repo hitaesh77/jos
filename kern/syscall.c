@@ -126,6 +126,26 @@ sys_env_set_status(envid_t envid, int status)
 	return 0;
 }
 
+// Initialze state of newly created environment. Exercise 7 
+static int
+sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+{
+	struct Env *e;
+	int r;
+
+	if ((r = envid2env(envid, &e, 1)) < 0)
+		return r;
+
+	user_mem_assert(curenv, tf, sizeof(*tf), PTE_U);
+
+	e->env_tf = *tf;
+	e->env_tf.tf_eflags |= FL_IF;
+	e->env_tf.tf_eflags &= ~FL_IOPL_MASK;
+	e->env_tf.tf_cs |= 3;
+
+	return 0;
+}
+
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
 // Env's 'env_pgfault_upcall' field.  When 'envid' causes a page fault, the
 // kernel will push a fault record onto the exception stack, then branch to
@@ -448,12 +468,14 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_yield:
 		sys_yield();
 		return 0;
-	case SYS_exofork:
-		return sys_exofork();
-	case SYS_env_set_status:
-		return sys_env_set_status(a1, a2);
-	case SYS_page_alloc:
-		return sys_page_alloc(a1, (void*) a2, a3);
+		case SYS_exofork:
+			return sys_exofork();
+		case SYS_env_set_status:
+			return sys_env_set_status(a1, a2);
+		case SYS_env_set_trapframe:
+			return sys_env_set_trapframe(a1, (struct Trapframe *) a2);
+		case SYS_page_alloc:
+			return sys_page_alloc(a1, (void*) a2, a3);
 	case SYS_page_map:
 		return sys_page_map(a1, (void*) a2, a3, (void*) a4, a5);
 	case SYS_page_unmap:

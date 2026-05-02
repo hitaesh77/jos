@@ -136,12 +136,24 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 static ssize_t
 devfile_write(struct Fd *fd, const void *buf, size_t n)
 {
+	int r;
+
 	// Make an FSREQ_WRITE request to the file system server.  Be
 	// careful: fsipcbuf.write.req_buf is only so large, but
 	// remember that write is always allowed to write *fewer*
 	// bytes than requested.
 	// LAB 5: Your code here
-	panic("devfile_write not implemented");
+	if (n > sizeof(fsipcbuf.write.req_buf))
+		n = sizeof(fsipcbuf.write.req_buf);
+
+	fsipcbuf.write.req_fileid = fd->fd_file.id;
+	fsipcbuf.write.req_n = n;
+	memmove(fsipcbuf.write.req_buf, buf, n);
+
+	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
+		return r;
+	assert(r <= n);
+	return r;
 }
 
 static int
@@ -177,4 +189,3 @@ sync(void)
 
 	return fsipc(FSREQ_SYNC, NULL);
 }
-
