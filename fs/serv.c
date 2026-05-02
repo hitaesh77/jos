@@ -217,14 +217,22 @@ serve_read(envid_t envid, union Fsipc *ipc)
 
 	struct OpenFile *o;
 	int r;
+	size_t n;
 
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
 
-	r = file_read(o->o_file, ret->ret_buf, req->req_n, o->o_fd->fd_offset);
+	n = req->req_n;
+	if (n > PGSIZE)
+		n = PGSIZE;
+
+	r = file_read(o->o_file, ret->ret_buf, n, o->o_fd->fd_offset);
 
 	if (r < 0)
 		return r;
+
+	if (r > PGSIZE)
+		r = PGSIZE;
 
 	o->o_fd->fd_offset += r;
 
