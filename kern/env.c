@@ -438,6 +438,10 @@ env_create(uint8_t *binary, enum EnvType type)
 		panic("env_create: %e", return_code);
 	}
 
+	if (type == ENV_TYPE_FS) {
+		process->env_tf.tf_eflags |= FL_IOPL_MASK;
+	}
+
 	// Load named elf binary with load_icode
 	load_icode(process, binary);
 
