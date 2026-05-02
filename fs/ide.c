@@ -7,12 +7,15 @@
 #include "fs.h"
 #include <inc/x86.h>
 
+int sys_ide_wait(void);
+
 #define IDE_BSY		0x80
 #define IDE_DRDY	0x40
 #define IDE_DF		0x20
 #define IDE_ERR		0x01
 
 static int diskno = 1;
+static bool irq_enabled;
 
 static int
 ide_wait_ready(bool check_error)
@@ -59,6 +62,18 @@ ide_set_disk(int d)
 	diskno = d;
 }
 
+static void
+ide_enable_irq(void)
+{
+	// This is only called once
+	// bwe dont want interrupts to race against htis
+	if (!irq_enabled) {
+		if (sys_ide_wait() < 0)
+			panic("sys_ide_wait");
+		irq_enabled = 1;
+	}
+}
+
 
 int
 ide_read(uint32_t secno, void *dst, size_t nsecs)
@@ -67,6 +82,7 @@ ide_read(uint32_t secno, void *dst, size_t nsecs)
 
 	assert(nsecs <= 256);
 
+	ide_enable_irq();
 	ide_wait_ready(0);
 
 	outb(0x1F2, nsecs);
@@ -77,6 +93,8 @@ ide_read(uint32_t secno, void *dst, size_t nsecs)
 	outb(0x1F7, 0x20);	// CMD 0x20 means read sector
 
 	for (; nsecs > 0; nsecs--, dst += SECTSIZE) {
+		if ((r = sys_ide_wait()) < 0)
+			return r;
 		if ((r = ide_wait_ready(1)) < 0)
 			return r;
 		insl(0x1F0, dst, SECTSIZE/4);
@@ -92,6 +110,7 @@ ide_write(uint32_t secno, const void *src, size_t nsecs)
 
 	assert(nsecs <= 256);
 
+	ide_enable_irq();
 	ide_wait_ready(0);
 
 	outb(0x1F2, nsecs);
@@ -105,8 +124,10 @@ ide_write(uint32_t secno, const void *src, size_t nsecs)
 		if ((r = ide_wait_ready(1)) < 0)
 			return r;
 		outsl(0x1F0, src, SECTSIZE/4);
+		if (nsecs > 1)
+			if ((r = sys_ide_wait()) < 0)
+				return r;
 	}
 
 	return 0;
 }
-

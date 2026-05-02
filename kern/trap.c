@@ -105,6 +105,7 @@ void irq_12(void);
 void irq_13(void);
 void irq_14(void);
 void irq_15(void);
+void ide_intr(void);
 
 void
 trap_init(void)
@@ -292,6 +293,13 @@ trap_dispatch(struct Trapframe *tf)
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
 		serial_intr();
 		lapic_eoi();
+		return;
+	}
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_IDE) {
+		ide_intr();
+		outb(IO_PIC2, 0x20); // get stuck without this
+		outb(IO_PIC1, 0x20);
+		lapic_eoi(); // acknowledge interrupt
 		return;
 	}
 

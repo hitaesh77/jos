@@ -11,6 +11,23 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 #include <kern/sched.h>
+#include <kern/picirq.h>
+
+static struct Env *ide_wait_env; // env specifically to wait for IDE itnerrupt
+static unsigned ide_irq_pending; // interrupt occurened but no process is waiting
+static bool ide_irq_enabled; // make sure its been enabled
+
+// Wait for IDE interrupt IF we can block
+static bool
+ide_can_block(void)
+{
+	struct Env *e;
+
+	for (e = envs; e < envs + NENV; e++)
+		if (e != curenv && e->env_status == ENV_RUNNABLE)
+			return 1;
+	return 0;
+}
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -442,7 +459,49 @@ sys_ipc_recv(void *dstva)
 
     //  not runnable, give up CPU
     curenv->env_status = ENV_NOT_RUNNABLE;
-    sched_yield(); 
+	sched_yield(); 
+	return 0;
+}
+
+void
+ide_intr(void)
+{
+	// If someone is waiting for ide_wait_env,
+	// set to RUNNABLE so it can check again
+	if (ide_wait_env) {
+		ide_wait_env->env_status = ENV_RUNNABLE;
+		ide_wait_env->env_tf.tf_regs.reg_eax = 0;
+		ide_wait_env = NULL;
+	} else {
+		ide_irq_pending++;
+	}
+}
+
+static int
+sys_ide_wait(void)
+{
+	// only ENV_TYPE_FS allowed to call this.
+	if (curenv->env_type != ENV_TYPE_FS)
+		return -E_INVAL;
+
+	if (!ide_irq_enabled) {
+		// allow IDE interrupts to occur
+		irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_IDE));
+		ide_irq_enabled = 1;
+		return 0;
+	}
+
+	if (ide_irq_pending > 0) {
+		ide_irq_pending--;
+		return 0;
+	}
+
+	if (!ide_can_block())
+		return 0;
+
+	ide_wait_env = curenv; // dont run this env, bc its waiting for interupt
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	sched_yield(); // give it up to scheduler
 	return 0;
 }
 
@@ -482,11 +541,13 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return sys_page_unmap(a1, (void*) a2);
 	case SYS_env_set_pgfault_upcall:
 		return sys_env_set_pgfault_upcall(a1, (void*) a2);
-	case SYS_ipc_try_send:
-    	return sys_ipc_try_send(a1, a2, (void*)a3, a4);
-	case SYS_ipc_recv:
-    	return sys_ipc_recv((void*)a1);
-	default:
-		return -E_INVAL;
-	}
+		case SYS_ipc_try_send:
+	    	return sys_ipc_try_send(a1, a2, (void*)a3, a4);
+		case SYS_ipc_recv:
+	    	return sys_ipc_recv((void*)a1);
+		case SYS_ide_wait:
+			return sys_ide_wait();
+		default:
+			return -E_INVAL;
+		}
 }
